@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sood Labs - Games by Kids, for Kids!</title>
+<meta name="description" content="Sood Labs is a tiny game studio where kids dream up games and bring them to life. Play free browser games made with imagination!">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0B0E2C;
+    --surface: #151A42;
+    --card: #1C2254;
+    --accent-yellow: #FFD93D;
+    --accent-pink: #FF6B9D;
+    --accent-cyan: #4ECDC4;
+    --accent-orange: #FF8C42;
+    --accent-purple: #A78BFA;
+    --text: #E8E6F0;
+    --text-muted: #9B97B0;
+    --radius: 20px;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* === BACKGROUND STARS === */
+  .stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .star {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: #fff;
+    border-radius: 50%;
+    animation: twinkle var(--dur) ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle {
+    0% { opacity: 0.15; transform: scale(0.8); }
+    100% { opacity: 0.8; transform: scale(1.2); }
+  }
+
+  /* === FLOATING SHAPES (bg decoration) === */
+  .shape {
+    position: fixed;
+    border-radius: 50%;
+    opacity: 0.06;
+    pointer-events: none;
+    z-index: 0;
+    animation: floatShape 20s ease-in-out infinite alternate;
+  }
+
+  .shape-1 { width: 400px; height: 400px; background: var(--accent-pink); top: -100px; right: -100px; }
+  .shape-2 { width: 300px; height: 300px; background: var(--accent-cyan); bottom: 10%; left: -80px; animation-delay: -7s; }
+  .shape-3 { width: 250px; height: 250px; background: var(--accent-yellow); top: 50%; right: 5%; animation-delay: -13s; }
+
+  @keyframes floatShape {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(30px, -40px) rotate(15deg); }
+  }
+
+  /* === LAYOUT === */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* === HEADER / HERO === */
+  .hero {
+    min-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 0 40px;
+    position: relative;
+  }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 2px solid rgba(255, 217, 61, 0.25);
+    border-radius: 50px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent-yellow);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 32px;
+    animation: fadeSlideDown 0.8s ease-out both;
+  }
+
+  .logo-badge .dot {
+    width: 8px;
+    height: 8px;
+    background: var(--accent-cyan);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.7); }
+  }
+
+  .hero-title {
+    font-family: 'Lilita One', cursive;
+    font-size: clamp(3.5rem, 10vw, 7rem);
+    line-height: 1;
+    margin-bottom: 8px;
+    animation: fadeSlideDown 0.8s ease-out 0.15s both;
+  }
+
+  .hero-title .word-sood {
+    background: linear-gradient(135deg, var(--accent-yellow) 0%, var(--accent-orange) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-title .word-labs {
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-subtitle {
+    font-size: clamp(1.1rem, 2.5vw, 1.45rem);
+    color: var(--text-muted);
+    max-width: 500px;
+    line-height: 1.6;
+    margin-bottom: 40px;
+    font-weight: 600;
+    animation: fadeSlideDown 0.8s ease-out 0.3s both;
+  }
+
+  .hero-subtitle em {
+    font-style: normal;
+    color: var(--accent-pink);
+  }
+
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange));
+    color: #1a1a2e;
+    font-family: 'Lilita One', cursive;
+    font-size: 1.25rem;
+    padding: 16px 36px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.25s, box-shadow 0.25s;
+    box-shadow: 0 6px 30px rgba(255, 217, 61, 0.3);
+    animation: fadeSlideDown 0.8s ease-out 0.45s both;
+  }
+
+  .hero-cta:hover {
+    transform: translateY(-3px) scale(1.03);
+    box-shadow: 0 10px 40px rgba(255, 217, 61, 0.45);
+  }
+
+  .hero-cta .arrow {
+    font-size: 1.4rem;
+    transition: transform 0.25s;
+  }
+
+  .hero-cta:hover .arrow {
+    transform: translateY(3px);
+  }
+
+  /* Bouncing emoji decorations around hero */
+  .hero-emoji {
+    position: absolute;
+    font-size: 2.2rem;
+    animation: emojiFloat 4s ease-in-out infinite alternate;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  .hero-emoji:nth-child(1) { top: 15%; left: 8%; animation-delay: 0s; }
+  .hero-emoji:nth-child(2) { top: 25%; right: 6%; animation-delay: -1s; }
+  .hero-emoji:nth-child(3) { bottom: 20%; left: 5%; animation-delay: -2s; }
+  .hero-emoji:nth-child(4) { bottom: 15%; right: 10%; animation-delay: -0.5s; }
+  .hero-emoji:nth-child(5) { top: 50%; left: 2%; animation-delay: -3s; }
+
+  @keyframes emojiFloat {
+    0% { transform: translateY(0px) rotate(-5deg); }
+    100% { transform: translateY(-18px) rotate(5deg); }
+  }
+
+  @keyframes fadeSlideDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* === GAMES SECTION === */
+  .section-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .section-tag {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--accent-cyan);
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: 'Lilita One', cursive;
+    font-size: clamp(2rem, 5vw, 3rem);
+    color: #fff;
+  }
+
+  .games-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 28px;
+    padding-bottom: 80px;
+  }
+
+  .game-card {
+    background: var(--card);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.05);
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    position: relative;
+  }
+
+  .game-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    border-color: var(--card-accent);
+  }
+
+  .card-preview {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card-preview .card-bg {
+    position: absolute;
+    inset: 0;
+    opacity: 0.15;
+  }
+
+  .card-emoji {
+    font-size: 5rem;
+    z-index: 1;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    transition: transform 0.3s;
+  }
+
+  .game-card:hover .card-emoji {
+    transform: scale(1.15) rotate(-3deg);
+  }
+
+  .card-body {
+    padding: 20px 24px 24px;
+  }
+
+  .card-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+  }
+
+  .card-title {
+    font-family: 'Lilita One', cursive;
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+
+  .card-desc {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    font-weight: 600;
+  }
+
+  .card-play {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 16px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: gap 0.25s;
+  }
+
+  .game-card:hover .card-play {
+    gap: 10px;
+  }
+
+  /* Card color themes */
+  .game-card.theme-ocean { --card-accent: #4A90D9; }
+  .game-card.theme-ocean .card-preview { background: linear-gradient(135deg, #1a3a5c, #2C5F8A); }
+  .game-card.theme-ocean .card-tag { background: rgba(74, 144, 217, 0.2); color: #6BB5FF; }
+  .game-card.theme-ocean .card-play { color: #6BB5FF; }
+
+  .game-card.theme-jungle { --card-accent: #4ECDC4; }
+  .game-card.theme-jungle .card-preview { background: linear-gradient(135deg, #1a3c35, #2C6B5A); }
+  .game-card.theme-jungle .card-tag { background: rgba(78, 205, 196, 0.2); color: #6EE7DE; }
+  .game-card.theme-jungle .card-play { color: #6EE7DE; }
+
+  .game-card.theme-space { --card-accent: #A78BFA; }
+  .game-card.theme-space .card-preview { background: linear-gradient(135deg, #2D1B69, #4C1D95); }
+  .game-card.theme-space .card-tag { background: rgba(167, 139, 250, 0.2); color: #C4B5FD; }
+  .game-card.theme-space .card-play { color: #C4B5FD; }
+
+  .game-card.theme-fire { --card-accent: #FF6B9D; }
+  .game-card.theme-fire .card-preview { background: linear-gradient(135deg, #5C1A2A, #8A2C4A); }
+  .game-card.theme-fire .card-tag { background: rgba(255, 107, 157, 0.2); color: #FF8DB5; }
+  .game-card.theme-fire .card-play { color: #FF8DB5; }
+
+  .game-card.theme-sun { --card-accent: #FFD93D; }
+  .game-card.theme-sun .card-preview { background: linear-gradient(135deg, #5C4B0A, #8A7210); }
+  .game-card.theme-sun .card-tag { background: rgba(255, 217, 61, 0.2); color: #FFE566; }
+  .game-card.theme-sun .card-play { color: #FFE566; }
+
+  /* === COMING SOON CARD === */
+  .game-card.coming-soon {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.1);
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .game-card.coming-soon:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .game-card.coming-soon .card-emoji {
+    font-size: 3.5rem;
+    opacity: 0.5;
+  }
+
+  .game-card.coming-soon:hover .card-emoji {
+    transform: none;
+  }
+
+  /* === ABOUT SECTION === */
+  .about {
+    padding: 60px 0 80px;
+    text-align: center;
+  }
+
+  .about-box {
+    background: var(--surface);
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius);
+    padding: 48px 40px;
+    max-width: 650px;
+    margin: 0 auto;
+  }
+
+  .about-box .about-emoji {
+    font-size: 3rem;
+    margin-bottom: 16px;
+  }
+
+  .about-box h2 {
+    font-family: 'Lilita One', cursive;
+    font-size: 1.8rem;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+
+  .about-box p {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+    font-weight: 600;
+  }
+
+  .about-box p + p {
+    margin-top: 12px;
+  }
+
+  /* === FOOTER === */
+  .footer {
+    text-align: center;
+    padding: 30px 0 40px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .footer span {
+    color: var(--accent-pink);
+  }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 640px) {
+    .games-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-emoji {
+      display: none;
+    }
+
+    .hero {
+      min-height: 60vh;
+      padding: 40px 0 30px;
+    }
+
+    .about-box {
+      padding: 32px 24px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Background stars -->
+<div class="stars" id="stars"></div>
+
+<!-- Floating blobs -->
+<div class="shape shape-1"></div>
+<div class="shape shape-2"></div>
+<div class="shape shape-3"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-emoji">🐟</div>
+  <div class="hero-emoji">🎮</div>
+  <div class="hero-emoji">🦀</div>
+  <div class="hero-emoji">🚀</div>
+  <div class="hero-emoji">🧪</div>
+
+  <div class="container">
+    <div class="logo-badge"><span class="dot"></span> Now Open</div>
+    <h1 class="hero-title">
+      <span class="word-sood">Sood</span> <span class="word-labs">Labs</span>
+    </h1>
+    <p class="hero-subtitle">Games dreamed up by kids, brought to life with code. Play free in your browser — no downloads, <em>just fun.</em></p>
+    <a href="#games" class="hero-cta">Play Our Games <span class="arrow">↓</span></a>
+  </div>
+</section>
+
+<!-- GAMES -->
+<section id="games">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">The Arcade</div>
+      <h2 class="section-title">Pick a Game</h2>
+    </div>
+
+    <div class="games-grid">
+
+      <!-- Fishing Game -->
+      <a href="fishing-game.html" class="game-card theme-ocean">
+        <div class="card-preview">
+          <span class="card-emoji">🎣</span>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Adventure</span>
+          <h3 class="card-title">Gone Fishin'</h3>
+          <p class="card-desc">Cast your line, bait your hook, and catch fish, crabs, and Nemo in a beautiful river. Fill your bucket!</p>
+          <div class="card-play">Play Now →</div>
+        </div>
+      </a>
+
+      <!-- Placeholder: future game -->
+      <div class="game-card theme-jungle coming-soon">
+        <div class="card-preview">
+          <span class="card-emoji">🧩</span>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Coming Soon</span>
+          <h3 class="card-title">Next Creation</h3>
+          <p class="card-desc">A new game is cooking in the lab! Check back soon to see what we dream up next.</p>
+        </div>
+      </div>
+
+      <!-- Placeholder: future game -->
+      <div class="game-card theme-space coming-soon">
+        <div class="card-preview">
+          <span class="card-emoji">🔮</span>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Coming Soon</span>
+          <h3 class="card-title">Top Secret</h3>
+          <p class="card-desc">Something mysterious is being built in the lab... stay tuned for the big reveal!</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="about">
+  <div class="container">
+    <div class="about-box">
+      <div class="about-emoji">🧪</div>
+      <h2>What is Sood Labs?</h2>
+      <p>Sood Labs is a tiny game studio where kids come up with wild game ideas and we bring them to life. Every game starts with a spark of imagination — then we build it together.</p>
+      <p>All games are free, run in your browser, and are made to be fun for little hands and big imaginations.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    Made with <span>♥</span> at Sood Labs &copy; 2026
+  </div>
+</footer>
+
+<script>
+  // Generate stars
+  const starsEl = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 100 + '%';
+    star.style.setProperty('--dur', (2 + Math.random() * 4) + 's');
+    star.style.animationDelay = -Math.random() * 5 + 's';
+    const size = 1.5 + Math.random() * 2.5;
+    star.style.width = size + 'px';
+    star.style.height = size + 'px';
+    starsEl.appendChild(star);
+  }
+
+  // Intersection observer for scroll animations
+  const cards = document.querySelectorAll('.game-card, .about-box');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  cards.forEach((card, i) => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(30px)';
+    card.style.transition = `opacity 0.6s ease ${i * 0.1}s, transform 0.6s ease ${i * 0.1}s`;
+    // Re-apply hover transform behavior after animation
+    if (!card.classList.contains('coming-soon')) {
+      card.addEventListener('mouseenter', () => card.style.transform = 'translateY(-6px)');
+      card.addEventListener('mouseleave', () => card.style.transform = 'translateY(0)');
+    }
+    observer.observe(card);
+  });
+</script>
+
+</body>
+</html>
