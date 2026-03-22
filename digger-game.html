@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLANE DASH</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --yellow: #FFD600;
+    --black: #0A0A0A;
+    --orange: #FF6B00;
+    --sky: #87CEEB;
+  }
+
+  body {
+    background: #87CEEB;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Space Mono', monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    color: var(--yellow);
+    letter-spacing: 0.1em;
+    text-shadow: 4px 4px 0 var(--orange), 8px 8px 0 rgba(0,0,0,0.3);
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    color: #888;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  #game-wrapper {
+    position: relative;
+    border: 3px solid var(--yellow);
+    box-shadow: 0 0 0 6px var(--orange), 0 0 60px rgba(255,214,0,0.2);
+  }
+
+  canvas {
+    display: block;
+    background: var(--sky);
+  }
+
+  #ui {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 18px;
+    background: #111;
+    border-top: 2px solid #222;
+  }
+
+  .score-block { display: flex; flex-direction: column; }
+  .score-label { font-size: 0.6rem; color: #555; letter-spacing: 0.15em; text-transform: uppercase; }
+  .score-val { font-size: 1.4rem; font-weight: 700; color: var(--yellow); font-family: 'Bebas Neue'; letter-spacing: 0.05em; }
+
+  #controls-hint {
+    font-size: 0.65rem;
+    color: #444;
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,10,10,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 10;
+  }
+
+  #overlay.hidden { display: none; }
+
+  .overlay-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    color: var(--yellow);
+    text-shadow: 3px 3px 0 var(--orange);
+    letter-spacing: 0.1em;
+  }
+
+  .overlay-msg {
+    color: #aaa;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  #start-btn {
+    margin-top: 8px;
+    padding: 14px 40px;
+    background: var(--yellow);
+    color: var(--black);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.15em;
+    border: none;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--orange);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+
+  #start-btn:hover { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--orange); }
+  #start-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--orange); }
+
+  .stars { display: none; }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<h1>PLANE DASH</h1>
+<p class="subtitle">Fly • Dodge • Munch Marshmallows!</p>
+
+<div id="game-wrapper">
+  <canvas id="canvas"></canvas>
+  <div id="ui">
+    <div class="score-block">
+      <span class="score-label">Score</span>
+      <span class="score-val" id="score-display">0</span>
+    </div>
+    <div id="controls-hint">SPACE / TAP to fly up!<br>Hold to keep flying 🛩️</div>
+    <div class="score-block" style="align-items:flex-end">
+      <span class="score-label">Best</span>
+      <span class="score-val" id="best-display">0</span>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="overlay-title" id="overlay-title">PLANE DASH</div>
+    <div class="overlay-msg" id="overlay-msg">Eat the marshmallows! 🍡</div>
+    <button id="start-btn">START</button>
+  </div>
+</div>
+
+<script>
+// ── Stars background ──────────────────────────────────────────────
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 80; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${2+Math.random()*4}s;--delay:${Math.random()*4}s;--bright:${0.3+Math.random()*0.7}`;
+  starsEl.appendChild(s);
+}
+
+// ── Canvas ────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = Math.min(window.innerWidth - 32, 700);
+const H = Math.round(W * 0.45);
+canvas.width = W;
+canvas.height = H;
+
+// ── Constants ────────────────────────────────────────────────────
+const GROUND_Y  = H - 60;
+const PLANE_W   = 64;
+const PLANE_H   = 28;
+const GRAVITY   = 0.28;
+const LIFT      = -0.55;   // applied every frame key is held
+const MAX_UP    = -7;
+const MAX_DOWN  = 6;
+
+// ── State ─────────────────────────────────────────────────────────
+let score = 0, best = 0, speed = 3, frame = 0, running = false;
+let plane = null, marshmallows = [], clouds = [], particles = [];
+let breakAnim = null;  // plane breaking apart animation
+let respawning = false, respawnTimer = 0; // respawn countdown
+let crashAnim = null;
+let keyHeld = false;
+let propAngle = 0;
+let lastObs = 0;
+
+// ── Plane ─────────────────────────────────────────────────────────
+function createPlane(small = false) {
+  return {
+    x: small ? -80 : 90,   // respawn from off-screen left
+    y: GROUND_Y - PLANE_H - 10,
+    vy: 0,
+    tilt: 0,
+    squash: 1, squashV: 0,
+    engineGlow: 0,
+    tongueTimer: 0,
+    fatness: 0,        // 0=slim → 4=very chubby
+    breaking: false,   // about to break
+    breakShake: 0      // screen shake counter before explosion
+  };
+}
+
+// ── Particles ─────────────────────────────────────────────────────
+function spawnParticles(x, y, count, color, speed = 3, life = 1) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd   = Math.random() * speed + 1;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 1,
+      life, maxLife: life,
+      color,
+      r: Math.random() * 5 + 2
+    });
+  }
+}
+
+// pink/white marshmallow bits
+function spawnMarshmallowBits(x, y) {
+  const cols = ['#FFB6C1','#fff','#FFD6E0','#FFECF0','#ff99bb'];
+  for (let i = 0; i < 22; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd   = Math.random() * 5 + 2;
+    particles.push({
+      x: x + (Math.random()-0.5)*20,
+      y: y + (Math.random()-0.5)*20,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 2,
+      life: 1.2, maxLife: 1.2,
+      color: cols[Math.floor(Math.random()*cols.length)],
+      r: Math.random() * 8 + 4,
+      isChunk: true
+    });
+  }
+}
+
+// ── Plane break-apart explosion ───────────────────────────────────
+function triggerBreak() {
+  if (!plane) return;
+  const cx = plane.x + PLANE_W / 2;
+  const cy = plane.y + PLANE_H / 2;
+  const fat = plane.fatness;
+
+  // Big flash particles
+  spawnParticles(cx, cy, 25, '#FFE066', 7, 1.5);
+  spawnParticles(cx, cy, 15, '#FF8800', 5, 1.2);
+  spawnParticles(cx, cy, 10, '#fff',    4, 0.8);
+
+  // Chunks: fuselage body, left wing, right wing, tail, cockpit
+  breakAnim = [
+    // fuselage
+    { type:'body',  x:cx,      y:cy,      vx:-1.5, vy:-5, spin:0, spinV: 0.12, alpha:1, fat },
+    // top wing
+    { type:'wing',  x:cx-10,   y:cy-8,    vx:-2,   vy:-7, spin:0, spinV:-0.18, alpha:1 },
+    // bottom wing
+    { type:'wing2', x:cx-10,   y:cy+8,    vx:-0.5, vy:-4, spin:0, spinV: 0.22, alpha:1 },
+    // tail
+    { type:'tail',  x:cx-PLANE_W*0.4, y:cy, vx: 2, vy:-3, spin:0, spinV:-0.15, alpha:1 },
+    // cockpit bubble
+    { type:'cockpit', x:cx+PLANE_W*0.3, y:cy-4, vx:3, vy:-6, spin:0, spinV:0.2, alpha:1 },
+  ];
+
+  plane = null;  // hide normal plane
+  respawning = true;
+  respawnTimer = 110; // frames until tiny plane flies in
+}
+
+function drawChunk(c) {
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.rotate(c.spin);
+  ctx.globalAlpha = c.alpha;
+
+  switch(c.type) {
+    case 'body': {
+      // fat fuselage chunk
+      const s = 0.7 + (c.fat||0) * 0.12;
+      ctx.scale(s, s);
+      ctx.fillStyle = '#E8F4FD';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 22, 10, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#4A90D9';
+      ctx.fillRect(-18, -3, 36, 6);
+      break;
+    }
+    case 'wing': {
+      ctx.fillStyle = '#C8E6FA';
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.lineTo(28, -18); ctx.lineTo(-4, -12);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#A0C8E8'; ctx.lineWidth = 1.5; ctx.stroke();
+      break;
+    }
+    case 'wing2': {
+      ctx.fillStyle = '#C8E6FA';
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(20, 0); ctx.lineTo(26, 16); ctx.lineTo(-4, 10);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#A0C8E8'; ctx.lineWidth = 1.5; ctx.stroke();
+      break;
+    }
+    case 'tail': {
+      ctx.fillStyle = '#4A90D9';
+      ctx.beginPath();
+      ctx.moveTo(0,0); ctx.lineTo(0,-18); ctx.lineTo(14,-4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#C8E6FA';
+      ctx.beginPath();
+      ctx.moveTo(0,0); ctx.lineTo(0,12); ctx.lineTo(12,2); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'cockpit': {
+      ctx.fillStyle = 'rgba(100,200,255,0.8)';
+      ctx.beginPath(); ctx.ellipse(0, 0, 10, 7, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#90C8E8'; ctx.lineWidth = 1.5; ctx.stroke();
+      // X eyes — broken!
+      ctx.strokeStyle = '#FF3300'; ctx.lineWidth = 1.5;
+      for (const ex of [-4, 3]) {
+        ctx.beginPath(); ctx.moveTo(ex-2,-2); ctx.lineTo(ex+2,2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ex+2,-2); ctx.lineTo(ex-2,2); ctx.stroke();
+      }
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function updateBreakAnim() {
+  if (!breakAnim) return;
+  breakAnim.forEach(c => {
+    c.x += c.vx;
+    c.y += c.vy;
+    c.vy += 0.3;     // gravity on chunks
+    c.spin += c.spinV;
+    c.alpha -= 0.012;
+    // bounce off ground
+    if (c.y > GROUND_Y - 5) { c.vy *= -0.35; c.y = GROUND_Y - 5; }
+  });
+  breakAnim = breakAnim.filter(c => c.alpha > 0);
+  if (breakAnim.length === 0) breakAnim = null;
+}
+
+// ── Respawn tiny plane swooping in ───────────────────────────────
+function updateRespawn() {
+  if (!respawning) return;
+  respawnTimer--;
+
+  if (respawnTimer === 80) {
+    // Spawn tiny plane flying in from left, offscreen
+    plane = createPlane(true);
+    plane.fatness = 0;
+    plane.y = GROUND_Y - PLANE_H - 20;
+  }
+
+  if (plane && plane.x < 90) {
+    // Swoop in fast then slow to position
+    plane.x += 8;
+    // Little swoop arc — dip then rise
+    const t = 1 - Math.max(0, (plane.x + 80) / 170);
+    plane.y = GROUND_Y - PLANE_H - 20 - Math.sin(t * Math.PI) * 40;
+  }
+
+  if (respawnTimer <= 0) {
+    respawning = false;
+    if (plane) plane.x = 90;
+  }
+}
+// Each marshmallow: a stack of 1-3 fluffy blobs
+function spawnMarshmallow() {
+  const count = 1 + Math.floor(Math.random() * 3); // 1..3 stacked
+  const blobR = 20;
+  const totalH = count * (blobR * 1.6);
+  return {
+    x: W + 30,
+    y: GROUND_Y - totalH,
+    w: blobR * 2.2,
+    h: totalH,
+    count,
+    blobR,
+    // squish animation when hit
+    squish: 1, squishDir: 0,
+    eating: false, eatProgress: 0,
+    // random pastel tint per marshmallow
+    hue: Math.random() * 40  // 0=white-pink, up to 40=peach
+  };
+}
+
+function drawMarshmallow(m) {
+  const cx = m.x + m.w / 2;
+  const blobR = m.blobR;
+  const blobH = blobR * 1.6;
+
+  ctx.save();
+
+  if (m.eating) {
+    // scale down as eaten
+    const s = 1 - m.eatProgress;
+    ctx.translate(cx, m.y + m.h);
+    ctx.scale(s + (1-s)*0.5, s);
+    ctx.translate(-cx, -(m.y + m.h));
+  }
+
+  for (let i = 0; i < m.count; i++) {
+    const by = m.y + m.h - i * blobH;  // bottom of this blob
+    const ty = by - blobH;
+    const midY = (by + ty) / 2;
+
+    // squish effect
+    const squishX = 1 + (m.squish - 1) * 0.7;
+    const squishY = 2 - squishX;
+
+    ctx.save();
+    ctx.translate(cx, midY);
+    ctx.scale(squishX, squishY);
+    ctx.translate(-cx, -midY);
+
+    // main blob body
+    const grad = ctx.createRadialGradient(cx - blobR*0.3, midY - blobR*0.3, 2, cx, midY, blobR * 1.1);
+    grad.addColorStop(0, `hsl(${340 + m.hue}, 100%, 97%)`);
+    grad.addColorStop(0.5, `hsl(${340 + m.hue}, 80%, 90%)`);
+    grad.addColorStop(1, `hsl(${340 + m.hue}, 60%, 80%)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, midY, blobR * 1.1, blobR * 0.85, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // soft outline
+    ctx.strokeStyle = `hsla(${340 + m.hue}, 60%, 75%, 0.6)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // top shine
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(cx - blobR*0.25, midY - blobR*0.3, blobR*0.45, blobR*0.25, -0.3, 0, Math.PI*2);
+    ctx.fill();
+
+    // cute face on bottom blob
+    if (i === 0) {
+      // eyes
+      ctx.fillStyle = '#c06080';
+      ctx.beginPath(); ctx.arc(cx - 7, midY - 2, 3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 7, midY - 2, 3, 0, Math.PI*2); ctx.fill();
+      // smile
+      ctx.strokeStyle = '#c06080'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, midY + 4, 5, 0.1, Math.PI - 0.1);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+// ── Drawing helpers ───────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+function drawCloud(cx, cy, scale) {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.scale(scale, scale);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  for (const [dx, dy, r] of [[0,0,20],[22,0,26],[-20,0,18],[40,0,20],[18,-14,16]]) {
+    ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── Propeller ─────────────────────────────────────────────────────
+function drawPropeller(cx, cy, angle, fast) {
+  const blades = 3;
+  for (let b = 0; b < blades; b++) {
+    const a = angle + (b / blades) * Math.PI * 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(a);
+    // blade
+    ctx.fillStyle = fast ? 'rgba(80,80,80,0.6)' : '#555';
+    ctx.beginPath();
+    ctx.ellipse(0, -14, 4, 14, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // hub
+  ctx.fillStyle = '#888';
+  ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#aaa';
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+}
+
+// ── Plane drawing ─────────────────────────────────────────────────
+function drawPlane(p) {
+  const x = p.x, y = p.y;
+  const fat = p.fatness; // 0..4
+  const bellyBulge = 1 + fat * 0.45; // scale fuselage height
+  const cx = x + PLANE_W / 2;
+  const cy = y + PLANE_H / 2;
+
+  ctx.save();
+  const tilt = Math.max(-0.35, Math.min(0.25, p.vy * 0.04));
+  ctx.translate(cx, cy);
+  ctx.rotate(tilt);
+  ctx.scale(1 + fat * 0.08, p.squash * bellyBulge); // wider AND taller as fat
+  ctx.translate(-cx, -cy);
+
+  // ── Engine exhaust trail ──
+  if (p.engineGlow > 0) {
+    const grd = ctx.createRadialGradient(x-8, cy, 0, x-8, cy, 18);
+    grd.addColorStop(0, `rgba(255,160,0,${p.engineGlow * 0.7})`);
+    grd.addColorStop(1, 'rgba(255,100,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.ellipse(x-8, cy, 18, 8, 0, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── FUSELAGE ──
+  // Colour shifts pinkish as plane gets fat
+  const fuseR = Math.round(232 + fat * 5);
+  const fuseG = Math.round(244 - fat * 30);
+  const fuseB = Math.round(253 - fat * 20);
+  ctx.fillStyle = `rgb(${fuseR},${fuseG},${fuseB})`;
+  ctx.beginPath();
+  ctx.moveTo(x + PLANE_W, cy);
+  ctx.quadraticCurveTo(x + PLANE_W + 4, cy, x + PLANE_W - 2, cy - 4);
+  ctx.lineTo(x + 10, cy - PLANE_H * 0.38);
+  ctx.lineTo(x + 4, cy - PLANE_H * 0.38);
+  ctx.quadraticCurveTo(x - 2, cy - PLANE_H * 0.3, x, cy);
+  ctx.quadraticCurveTo(x - 2, cy + PLANE_H * 0.25, x + 4, cy + PLANE_H * 0.3);
+  ctx.lineTo(x + 10, cy + PLANE_H * 0.3);
+  ctx.lineTo(x + PLANE_W - 2, cy + 4);
+  ctx.closePath();
+  ctx.fill();
+
+  // fuselage stripe
+  ctx.fillStyle = '#4A90D9';
+  ctx.beginPath();
+  ctx.moveTo(x + 8, cy - 3); ctx.lineTo(x + PLANE_W - 10, cy - 3);
+  ctx.lineTo(x + PLANE_W - 10, cy + 3); ctx.lineTo(x + 8, cy + 3);
+  ctx.closePath(); ctx.fill();
+
+  // ── MAIN WING ──
+  ctx.fillStyle = '#C8E6FA';
+  ctx.beginPath();
+  ctx.moveTo(x + 22, cy - 2); ctx.lineTo(x + 42, cy - 2);
+  ctx.lineTo(x + 52, cy - PLANE_H * 1.1); ctx.lineTo(x + 18, cy - PLANE_H * 0.8);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#A0C8E8'; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // lower wing
+  ctx.fillStyle = '#C8E6FA';
+  ctx.beginPath();
+  ctx.moveTo(x + 22, cy + 2); ctx.lineTo(x + 42, cy + 2);
+  ctx.lineTo(x + 50, cy + PLANE_H * 0.9); ctx.lineTo(x + 18, cy + PLANE_H * 0.65);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── TAIL FINS ──
+  ctx.fillStyle = '#4A90D9';
+  ctx.beginPath(); ctx.moveTo(x+4,cy-2); ctx.lineTo(x+4,cy-PLANE_H*0.85); ctx.lineTo(x+16,cy-4); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#C8E6FA';
+  ctx.beginPath(); ctx.moveTo(x+4,cy+2); ctx.lineTo(x+4,cy+PLANE_H*0.55); ctx.lineTo(x+16,cy+3); ctx.closePath(); ctx.fill();
+
+  // ── COCKPIT WINDOW ──
+  ctx.fillStyle = 'rgba(100,200,255,0.75)';
+  ctx.beginPath(); ctx.ellipse(x + PLANE_W - 14, cy - 4, 10, 7, -0.15, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#90C8E8'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath(); ctx.ellipse(x + PLANE_W - 16, cy - 6, 4, 3, -0.3, 0, Math.PI*2); ctx.fill();
+
+  // ── FACE IN WINDOW (changes expression with fatness / breaking) ──
+  const wx = x + PLANE_W - 14, wy = cy - 4;
+  if (p.breaking) {
+    // PANIC face — spiral eyes, screaming mouth
+    ctx.strokeStyle = '#FF2200'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    for (const ex of [wx - 4, wx + 3]) {
+      ctx.beginPath(); ctx.arc(ex, wy - 1, 3, 0, Math.PI * 1.6); ctx.stroke();
+    }
+    ctx.fillStyle = '#FF2200';
+    ctx.beginPath(); ctx.ellipse(wx, wy + 4, 3, 4, 0, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#88ccff'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(wx+6, wy-5); ctx.lineTo(wx+8, wy-1); ctx.stroke();
+  } else if (fat > 1.5) {
+    // chubby happy face — rosy cheeks
+    ctx.fillStyle = '#ff8866';
+    ctx.beginPath(); ctx.arc(wx - 5, wy + 1, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(wx + 5, wy + 1, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#c06030';
+    ctx.beginPath(); ctx.arc(wx - 3, wy - 2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(wx + 3, wy - 2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#c06030'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(wx, wy + 2, 4, 0.1, Math.PI-0.1); ctx.stroke();
+  }
+
+  // ── TONGUE ──
+  if (p.tongueTimer > 0) {
+    const t = p.tongueTimer / 40;
+    const ext = t < 0.5 ? t / 0.5 : (1 - t) / 0.5;
+    const tongueLen = 26 * Math.min(1, ext);
+    const tongueW   = 9;
+    const noseX = x + PLANE_W + 2;
+    const noseY = cy + 3;
+    ctx.fillStyle = '#FF4D88';
+    ctx.beginPath();
+    ctx.moveTo(noseX, noseY - tongueW * 0.4);
+    ctx.quadraticCurveTo(noseX + tongueLen*0.5, noseY - tongueW*0.6, noseX + tongueLen, noseY);
+    ctx.quadraticCurveTo(noseX + tongueLen*0.5, noseY + tongueW*0.6, noseX, noseY + tongueW*0.4);
+    ctx.closePath(); ctx.fill();
+    if (tongueLen > 6) {
+      const tipX = noseX + tongueLen;
+      ctx.fillStyle = '#FF2266';
+      ctx.beginPath(); ctx.arc(tipX-4, noseY-3, 5, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(tipX-4, noseY+3, 5, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,180,200,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(noseX + tongueLen*0.35, noseY-1, tongueLen*0.25, tongueW*0.2, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // ── PROPELLER ──
+  const propSpeed = keyHeld ? 0.45 : 0.18;
+  propAngle += propSpeed;
+  drawPropeller(x + PLANE_W + 1, cy + tilt * 10, propAngle, propSpeed > 0.3);
+
+  // ── SHADOW (fatter = bigger shadow) ──
+  ctx.fillStyle = 'rgba(0,0,0,0.1)';
+  ctx.beginPath();
+  ctx.ellipse(cx, GROUND_Y + 5, PLANE_W * (0.4 + fat * 0.06), 5, 0, 0, Math.PI*2);
+  ctx.fill();
+}
+
+// ── Ground ────────────────────────────────────────────────────────
+function drawGround() {
+  // grass strip
+  const grad = ctx.createLinearGradient(0, GROUND_Y, 0, H);
+  grad.addColorStop(0, '#5a8a3a');
+  grad.addColorStop(0.1, '#4a7a2a');
+  grad.addColorStop(1, '#3a5a1a');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+
+  // ground line
+  ctx.strokeStyle = '#6aaa4a'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y); ctx.lineTo(W, GROUND_Y); ctx.stroke();
+
+  // runway dashes
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 3;
+  ctx.setLineDash([30, 20]);
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y + 15); ctx.lineTo(W, GROUND_Y + 15); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ── Particles ─────────────────────────────────────────────────────
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── HUD ───────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('best-display').textContent = best;
+}
+
+// ── Collision ─────────────────────────────────────────────────────
+function collides(p, m) {
+  const margin = 10;
+  return (
+    p.x + margin < m.x + m.w - margin &&
+    p.x + PLANE_W - margin > m.x + margin &&
+    p.y + margin < m.y + m.h &&
+    p.y + PLANE_H - margin > m.y + margin
+  );
+}
+
+// ── Input ─────────────────────────────────────────────────────────
+function startFly() { keyHeld = true; }
+function stopFly()  { keyHeld = false; }
+
+function jump() { if (running) keyHeld = true; }
+
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); startFly(); }
+});
+window.addEventListener('keyup', e => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') stopFly();
+});
+canvas.addEventListener('pointerdown', e => { e.preventDefault(); startFly(); });
+canvas.addEventListener('pointerup',   e => { e.preventDefault(); stopFly(); });
+canvas.addEventListener('pointerleave',e => stopFly());
+
+// ── Init ──────────────────────────────────────────────────────────
+function init() {
+  score = 0; speed = 3; frame = 0;
+  plane = createPlane();
+  marshmallows = [];
+  clouds = [spawnCloud(), spawnCloud()];
+  clouds[0].x = W * 0.3; clouds[1].x = W * 0.7;
+  particles = [];
+  breakAnim = null;
+  respawning = false;
+  respawnTimer = 0;
+  crashAnim = null;
+  keyHeld = false;
+  running = true;
+  lastObs = -999;
+  updateHUD();
+}
+
+function spawnCloud() {
+  return {
+    x: W + 50,
+    y: 20 + Math.random() * (GROUND_Y * 0.5),
+    scale: 0.6 + Math.random() * 0.8,
+    speed: 0.3 + Math.random() * 0.5
+  };
+}
+
+// ── Update ────────────────────────────────────────────────────────
+function update() {
+  if (!running) return;
+  frame++;
+  score = Math.floor(frame / 6);
+  if (score > best) best = score;
+
+  speed = 3 + score * 0.0015;
+
+  // spawn marshmallows
+  const gap = frame < 60 ? 35 : Math.max(70, 110 - score * 0.05);
+  if (frame - lastObs > gap + Math.random() * 40) {
+    marshmallows.push(spawnMarshmallow());
+    lastObs = frame;
+  }
+
+  // clouds
+  if (Math.random() < 0.004) clouds.push(spawnCloud());
+  clouds.forEach(c => c.x -= c.speed);
+  clouds = clouds.filter(c => c.x > -150);
+
+  // move marshmallows
+  marshmallows.forEach(m => {
+    m.x -= speed;
+    // squish recovery
+    if (m.squish !== 1) {
+      m.squish += (1 - m.squish) * 0.15;
+      if (Math.abs(m.squish - 1) < 0.01) m.squish = 1;
+    }
+    // eating animation
+    if (m.eating) {
+      m.eatProgress += 0.045;
+    }
+  });
+  marshmallows = marshmallows.filter(m => m.x > -80 && m.eatProgress < 1);
+
+  // plane physics — hold key to fly up
+  if (plane && !plane.breaking) {
+    if (keyHeld) {
+      plane.vy += LIFT;
+      plane.engineGlow = Math.min(1, plane.engineGlow + 0.2);
+    } else {
+      plane.vy += GRAVITY;
+      plane.engineGlow = Math.max(0, plane.engineGlow - 0.1);
+    }
+    plane.vy = Math.max(MAX_UP, Math.min(MAX_DOWN, plane.vy));
+    plane.y += plane.vy;
+
+    // floor & ceiling
+    const ceil = 10;
+    if (plane.y < ceil) { plane.y = ceil; plane.vy = 0; }
+    if (plane.y >= GROUND_Y - PLANE_H) {
+      plane.y = GROUND_Y - PLANE_H;
+      if (plane.vy > 1) {
+        plane.squash = 0.75; plane.squashV = 0.1;
+        spawnParticles(plane.x + PLANE_W/2, GROUND_Y, 8, '#8BC34A', 3);
+      }
+      plane.vy = 0;
+    }
+  }
+
+  // squash recovery
+  if (plane && plane.squash !== 1) {
+    plane.squash += plane.squashV;
+    if (plane.squash >= 1) { plane.squash = 1; plane.squashV = 0; }
+    else plane.squashV += 0.012;
+  }
+
+  // tick tongue timer
+  if (plane && plane.tongueTimer > 0) plane.tongueTimer--;
+
+  // particles
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life -= 0.03;
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // collision with marshmallows
+  for (const m of marshmallows) {
+    if (!m.eating && plane && collides(plane, m)) {
+      m.eating = true;
+      m.squish = 0.4;
+      spawnMarshmallowBits(m.x + m.w/2, m.y + m.h/2);
+      plane.tongueTimer = 40;
+      plane.fatness = Math.min(plane.fatness + 0.35, 4);
+      score += 5;
+
+      // too fat — shake then BREAK!
+      if (plane.fatness >= 3.5 && !plane.breaking) {
+        plane.breaking = true;
+        plane.breakShake = 30; // shake for 30 frames then explode
+      }
+    }
+  }
+
+  // breaking sequence — shake then explode
+  if (plane && plane.breaking) {
+    plane.breakShake--;
+    // violent wobble shake
+    plane.x += (Math.random() - 0.5) * 6;
+    plane.y += (Math.random() - 0.5) * 4;
+    if (plane.breakShake <= 0) {
+      triggerBreak();
+    }
+  }
+
+  // update break chunks
+  updateBreakAnim();
+  // update respawn
+  updateRespawn();
+
+  updateHUD();
+}
+
+// ── Crash (hitting the ground hard or out of bounds) ─────────────
+// Plane never "game overs" from marshmallows — it eats them!
+// Game over only if plane hits the ground at speed
+// (kept simple: actually the toddler version never game overs easily)
+
+// ── Draw ──────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // sky gradient (daytime, cheerful)
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
+  skyGrad.addColorStop(0, '#87CEEB');
+  skyGrad.addColorStop(1, '#C8E8F8');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, GROUND_Y);
+
+  // sun
+  ctx.fillStyle = '#FFE066';
+  ctx.beginPath(); ctx.arc(W - 60, 45, 28, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,220,0,0.2)';
+  ctx.beginPath(); ctx.arc(W - 60, 45, 42, 0, Math.PI*2); ctx.fill();
+
+  // clouds
+  clouds.forEach(c => drawCloud(c.x, c.y, c.scale));
+
+  // ground
+  drawGround();
+
+  // marshmallows
+  for (const m of marshmallows) drawMarshmallow(m);
+
+  // particles
+  drawParticles();
+
+  // break chunks flying apart
+  if (breakAnim) breakAnim.forEach(c => drawChunk(c));
+
+  // plane
+  if (plane) drawPlane(plane);
+  if (crashAnim) drawCrashPlane();
+
+  // respawn flash text
+  if (respawning && respawnTimer < 80 && respawnTimer > 20) {
+    const alpha = Math.min(1, (80 - respawnTimer) / 15) * Math.min(1, (respawnTimer - 20) / 15);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold 22px "Bebas Neue", sans-serif';
+    ctx.fillStyle = '#FFD600';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#FF6B00';
+    ctx.shadowBlur = 8;
+    ctx.fillText('✨ NEW PLANE! ✨', plane ? plane.x + 40 : W/2, (plane ? plane.y : H/2) - 20);
+    ctx.restore();
+  }
+}
+
+// ── Crash plane (spin out) ────────────────────────────────────────
+function drawCrashPlane() {
+  // not used in this version — marshmallows get eaten, no crash!
+}
+
+function updateCrash() {}
+
+// ── Loop ─────────────────────────────────────────────────────────
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  init();
+  document.getElementById('overlay').classList.add('hidden');
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

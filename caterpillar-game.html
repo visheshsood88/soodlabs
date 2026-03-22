@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Very Hungry Caterpillar</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const CELL = 24;
+const COLS = 25;
+const ROWS = 20;
+const W = COLS * CELL;
+const H = ROWS * CELL;
+const TICK_MS = 200;
+const WIN_LENGTH = 20;
+const START_LENGTH = 4;
+
+const GOOD_FOODS = [
+  { emoji: "\u{1F90D}", name: "marshmallow" },
+  { emoji: "\u{1F343}", name: "leaf" },
+  { emoji: "\u{1F33F}", name: "leaf" },
+  { emoji: "\u{1F340}", name: "clover" },
+];
+
+const BAD_FOOD = { emoji: "\u{1F336}\uFE0F", name: "chilli" };
+
+const DIR = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+
+const CATERPILLAR_COLORS = [
+  "#e53935", "#ff9800", "#fdd835", "#43a047",
+  "#e53935", "#ff9800", "#fdd835", "#43a047",
+];
+
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function spawnFoods(snake, count) {
+  const occupied = new Set(snake.map((s) => `${s[0]},${s[1]}`));
+  const foods = [];
+  for (let i = 0; i < count; i++) {
+    let pos;
+    do {
+      pos = [rand(0, COLS), rand(0, ROWS)];
+    } while (occupied.has(`${pos[0]},${pos[1]}`));
+    occupied.add(`${pos[0]},${pos[1]}`);
+    const isGood = Math.random() > 0.2;
+    if (isGood) {
+      const item = GOOD_FOODS[rand(0, GOOD_FOODS.length)];
+      foods.push({ pos, ...item, good: true });
+    } else {
+      foods.push({ pos, ...BAD_FOOD, good: false });
+    }
+  }
+  return foods;
+}
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+function HungryCaterpillarGame() {
+  const [screen, setScreen] = useState("title");
+  const [snake, setSnake] = useState([]);
+  const [dir, setDir] = useState([1, 0]);
+  const [foods, setFoods] = useState([]);
+  const [score, setScore] = useState(0);
+  const [message, setMessage] = useState(null);
+  const [butterflyAnim, setButterflyAnim] = useState(false);
+  const [transformStage, setTransformStage] = useState(0);
+  const [day, setDay] = useState(0);
+  const [eaten, setEaten] = useState(0);
+
+  const dirRef = useRef(dir);
+  const snakeRef = useRef(snake);
+  const foodsRef = useRef(foods);
+  const screenRef = useRef(screen);
+  const queueRef = useRef([]);
+
+  useEffect(() => { dirRef.current = dir; }, [dir]);
+  useEffect(() => { snakeRef.current = snake; }, [snake]);
+  useEffect(() => { foodsRef.current = foods; }, [foods]);
+  useEffect(() => { screenRef.current = screen; }, [screen]);
+
+  const startGame = useCallback(() => {
+    const startSnake = [];
+    for (let i = START_LENGTH - 1; i >= 0; i--) {
+      startSnake.push([3 + i, Math.floor(ROWS / 2)]);
+    }
+    setSnake(startSnake);
+    setDir([1, 0]);
+    dirRef.current = [1, 0];
+    queueRef.current = [];
+    setFoods(spawnFoods(startSnake, 6));
+    setScore(0);
+    setMessage(null);
+    setDay(0);
+    setEaten(0);
+    setScreen("play");
+    setButterflyAnim(false);
+    setTransformStage(0);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (DIR[e.key]) {
+        e.preventDefault();
+        const newDir = DIR[e.key];
+        const lastDir = queueRef.current.length > 0 ? queueRef.current[queueRef.current.length - 1] : dirRef.current;
+        if (newDir[0] + lastDir[0] !== 0 || newDir[1] + lastDir[1] !== 0) {
+          queueRef.current.push(newDir);
+        }
+      }
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        if (screenRef.current === "title") startGame();
+        else if (screenRef.current === "win") startGame();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [startGame]);
+
+  useEffect(() => {
+    if (screen !== "play") return;
+    const interval = setInterval(() => {
+      if (queueRef.current.length > 0) {
+        const next = queueRef.current.shift();
+        dirRef.current = next;
+        setDir(next);
+      }
+
+      const s = [...snakeRef.current];
+      const d = dirRef.current;
+      let nx = s[0][0] + d[0];
+      let ny = s[0][1] + d[1];
+      if (nx < 0) nx = COLS - 1;
+      if (nx >= COLS) nx = 0;
+      if (ny < 0) ny = ROWS - 1;
+      if (ny >= ROWS) ny = 0;
+      const head = [nx, ny];
+
+      s.unshift(head);
+
+      let ate = false;
+      let ateGood = false;
+      let ateEmoji = "";
+      let ateName = "";
+      const currentFoods = [...foodsRef.current];
+      let newFoods = currentFoods;
+
+      for (let fi = 0; fi < currentFoods.length; fi++) {
+        const f = currentFoods[fi];
+        if (f.pos[0] === head[0] && f.pos[1] === head[1]) {
+          ate = true;
+          ateGood = f.good;
+          ateEmoji = f.emoji;
+          ateName = f.name;
+          newFoods = currentFoods.filter((_, i) => i !== fi);
+          break;
+        }
+      }
+
+      if (ate) {
+        if (ateGood) {
+          setScore((p) => p + 10);
+          setMessage({ text: `Yum! ${ateEmoji} ${ateName}!`, type: "good" });
+          setEaten((p) => p + 1);
+          setDay((p) => Math.min(p + 1, 6));
+        } else {
+          s.pop();
+          if (s.length > 2) s.pop();
+          setMessage({ text: `Too spicy! \u{1F336}\uFE0F`, type: "bad" });
+        }
+        const extra = spawnFoods(s, 1);
+        newFoods = [...newFoods, ...extra];
+        if (newFoods.length < 5) {
+          newFoods = [...newFoods, ...spawnFoods(s, 2)];
+        }
+        setFoods(newFoods);
+        foodsRef.current = newFoods;
+      } else {
+        s.pop();
+      }
+
+      if (s.length >= WIN_LENGTH) {
+        setSnake(s);
+        snakeRef.current = s;
+        setButterflyAnim(true);
+        setTransformStage(1);
+        setTimeout(() => setTransformStage(2), 1200);
+        setTimeout(() => setTransformStage(3), 3000);
+        setTimeout(() => setTransformStage(4), 4500);
+        setTimeout(() => setScreen("win"), 6500);
+        return;
+      }
+
+      setSnake(s);
+      snakeRef.current = s;
+    }, TICK_MS);
+    return () => clearInterval(interval);
+  }, [screen]);
+
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(null), 1500);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  const progress = Math.min(1, Math.max(0, (snake.length - START_LENGTH) / (WIN_LENGTH - START_LENGTH)));
+
+  if (screen === "title") return <TitleScreen onStart={startGame} />;
+  if (screen === "win") return <WinScreen score={score} eaten={eaten} onRestart={startGame} />;
+
+  return (
+    <div style={{
+      width: "100%", minHeight: "100vh",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(180deg, #1a472a 0%, #2d5a27 40%, #4a7c3f 100%)",
+      fontFamily: "'Fredoka', 'Baloo 2', sans-serif",
+      position: "relative", overflow: "hidden",
+      userSelect: "none",
+    }}>
+      <FloatingEmoji />
+
+      <div style={{
+        display: "flex", alignItems: "center", gap: 20, marginBottom: 10,
+        color: "#fdd835", fontSize: 22, fontWeight: 700,
+        textShadow: "0 2px 8px rgba(0,0,0,0.4)",
+        flexWrap: "wrap", justifyContent: "center",
+      }}>
+        <span>{"\u{1F41B}"} Score: {score}</span>
+        <span style={{ color: "#a5d6a7" }}>{"\u2022"}</span>
+        <span>{"\u{1F4C5}"} {DAYS[day]}</span>
+        <span style={{ color: "#a5d6a7" }}>{"\u2022"}</span>
+        <span>{"\u{1F37D}\uFE0F"} {eaten}</span>
+      </div>
+
+      <div style={{
+        width: W, maxWidth: "95vw", height: 28, borderRadius: 14,
+        background: "rgba(0,0,0,0.35)", marginBottom: 10,
+        overflow: "hidden", border: "3px solid rgba(255,255,255,0.15)",
+        position: "relative",
+      }}>
+        <div style={{
+          height: "100%", borderRadius: 11,
+          background: "linear-gradient(90deg, #66bb6a, #aed581, #fdd835, #ffb74d, #ff8a65)",
+          width: `${progress * 100}%`,
+          transition: "width 0.4s ease",
+          boxShadow: "0 0 14px rgba(253,216,53,0.4)",
+        }} />
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 14, color: "#fff", fontWeight: 700,
+          textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+        }}>
+          {"\u{1F41B}"} {"\u27A1"} {"\u{1F98B}"} {Math.round(progress * 100)}%
+        </div>
+      </div>
+
+      <div style={{ position: "relative", maxWidth: "95vw", overflow: "hidden", borderRadius: 16 }}>
+        <svg width={W} height={H} style={{
+          display: "block",
+          borderRadius: 16,
+          background: "linear-gradient(180deg, #388e3c 0%, #2e7d32 100%)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 0 80px rgba(0,0,0,0.08)",
+          border: "4px solid rgba(255,255,255,0.12)",
+        }}>
+          {Array.from({ length: 40 }).map((_, i) => (
+            <circle key={`g${i}`} cx={rand(0, W)} cy={rand(0, H)} r={rand(1, 4)}
+              fill="rgba(76,175,80,0.25)" />
+          ))}
+
+          {foods.map((f, i) => (
+            <g key={`f${i}-${f.pos[0]}-${f.pos[1]}`}>
+              <circle
+                cx={f.pos[0] * CELL + CELL / 2}
+                cy={f.pos[1] * CELL + CELL / 2}
+                r={18}
+                fill={f.good ? "rgba(255,255,255,0.15)" : "rgba(244,67,54,0.2)"}
+              />
+              {!f.good && (
+                <circle
+                  cx={f.pos[0] * CELL + CELL / 2}
+                  cy={f.pos[1] * CELL + CELL / 2}
+                  r={22}
+                  fill="none" stroke="rgba(244,67,54,0.35)" strokeWidth={2}
+                  strokeDasharray="4 3"
+                />
+              )}
+              <text
+                x={f.pos[0] * CELL + CELL / 2}
+                y={f.pos[1] * CELL + CELL / 2 + 8}
+                textAnchor="middle"
+                fontSize="28"
+                style={{ pointerEvents: "none", filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.3))" }}
+              >
+                {f.emoji}
+              </text>
+            </g>
+          ))}
+
+          {transformStage < 2 && [...snake].reverse().map((seg, ri) => {
+            const i = snake.length - 1 - ri;
+            const colorIdx = i % CATERPILLAR_COLORS.length;
+            const isHead = i === 0;
+            const size = isHead ? CELL * 0.6 : CELL * 0.48;
+            return (
+              <g key={ri}>
+                <ellipse
+                  cx={seg[0] * CELL + CELL / 2 + 1}
+                  cy={seg[1] * CELL + CELL / 2 + 2}
+                  rx={size} ry={size * 0.7}
+                  fill="rgba(0,0,0,0.12)"
+                />
+                <circle
+                  cx={seg[0] * CELL + CELL / 2}
+                  cy={seg[1] * CELL + CELL / 2}
+                  r={size}
+                  fill={isHead ? "#8d6e63" : CATERPILLAR_COLORS[colorIdx]}
+                  stroke={isHead ? "#5d4037" : "rgba(0,0,0,0.15)"}
+                  strokeWidth={isHead ? 2.5 : 1.5}
+                />
+                {!isHead && (
+                  <circle
+                    cx={seg[0] * CELL + CELL / 2 - 3}
+                    cy={seg[1] * CELL + CELL / 2 - 3}
+                    r={size * 0.3}
+                    fill="rgba(255,255,255,0.25)"
+                  />
+                )}
+                {isHead && <>
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 4 - dir[1] * 5}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 4 + dir[0] * 5}
+                    r={5} fill="white" stroke="rgba(0,0,0,0.15)" strokeWidth={0.5} />
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 4 + dir[1] * 5}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 4 - dir[0] * 5}
+                    r={5} fill="white" stroke="rgba(0,0,0,0.15)" strokeWidth={0.5} />
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 5.5 - dir[1] * 5}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 5.5 + dir[0] * 5}
+                    r={2.5} fill="#333" />
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 5.5 + dir[1] * 5}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 5.5 - dir[0] * 5}
+                    r={2.5} fill="#333" />
+                  <path
+                    d={`M ${seg[0] * CELL + CELL / 2 + dir[0] * 7 - dir[1] * 3} ${seg[1] * CELL + CELL / 2 + dir[1] * 7 + dir[0] * 3} Q ${seg[0] * CELL + CELL / 2 + dir[0] * 9} ${seg[1] * CELL + CELL / 2 + dir[1] * 9} ${seg[0] * CELL + CELL / 2 + dir[0] * 7 + dir[1] * 3} ${seg[1] * CELL + CELL / 2 + dir[1] * 7 - dir[0] * 3}`}
+                    fill="none" stroke="#5d4037" strokeWidth={1.5} strokeLinecap="round"
+                  />
+                  <line
+                    x1={seg[0] * CELL + CELL / 2 + dir[0] * 6 - dir[1] * 5}
+                    y1={seg[1] * CELL + CELL / 2 + dir[1] * 6 + dir[0] * 5}
+                    x2={seg[0] * CELL + CELL / 2 + dir[0] * 13 - dir[1] * 9}
+                    y2={seg[1] * CELL + CELL / 2 + dir[1] * 13 + dir[0] * 9}
+                    stroke="#5d4037" strokeWidth={2} strokeLinecap="round" />
+                  <line
+                    x1={seg[0] * CELL + CELL / 2 + dir[0] * 6 + dir[1] * 5}
+                    y1={seg[1] * CELL + CELL / 2 + dir[1] * 6 - dir[0] * 5}
+                    x2={seg[0] * CELL + CELL / 2 + dir[0] * 13 + dir[1] * 9}
+                    y2={seg[1] * CELL + CELL / 2 + dir[1] * 13 - dir[0] * 9}
+                    stroke="#5d4037" strokeWidth={2} strokeLinecap="round" />
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 13 - dir[1] * 9}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 13 + dir[0] * 9}
+                    r={3} fill="#e53935" />
+                  <circle cx={seg[0] * CELL + CELL / 2 + dir[0] * 13 + dir[1] * 9}
+                    cy={seg[1] * CELL + CELL / 2 + dir[1] * 13 - dir[0] * 9}
+                    r={3} fill="#e53935" />
+                </>}
+              </g>
+            );
+          })}
+
+          {butterflyAnim && (
+            <g>
+              <rect width={W} height={H} fill="white"
+                opacity={transformStage >= 1 ? 0.5 : 0}
+                style={{ transition: "opacity 1s ease" }} />
+
+              {transformStage === 1 && (
+                <g>
+                  {CATERPILLAR_COLORS.slice(0, 8).map((c, i) => {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const r = 25 - i * 1.5;
+                    return (
+                      <circle key={i}
+                        cx={W / 2 + Math.cos(angle) * r}
+                        cy={H / 2 + Math.sin(angle) * r}
+                        r={CELL * 0.45}
+                        fill={c} stroke="rgba(0,0,0,0.15)" strokeWidth={1.5}
+                        style={{
+                          animation: `curlIn 1s ease forwards`,
+                          animationDelay: `${i * 0.08}s`,
+                        }}
+                      />
+                    );
+                  })}
+                  <text x={W / 2} y={H / 2 - 50} textAnchor="middle" fontSize="22"
+                    fill="#5d4037" fontFamily="Fredoka" fontWeight="700"
+                    style={{ animation: "fadeIn 0.8s ease forwards" }}>
+                    Time to transform...
+                  </text>
+                </g>
+              )}
+
+              {transformStage === 2 && (
+                <g>
+                  <ellipse cx={W / 2} cy={H / 2} rx={35} ry={50}
+                    fill="#8d6e63" stroke="#5d4037" strokeWidth={3}
+                    style={{ animation: "cocoonForm 1s ease forwards" }} />
+                  <ellipse cx={W / 2 - 5} cy={H / 2 - 10} rx={12} ry={20}
+                    fill="rgba(255,255,255,0.15)" />
+                  <line x1={W / 2} y1={H / 2 - 50} x2={W / 2 - 10} y2={H / 2 - 70}
+                    stroke="#a1887f" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={W / 2} y1={H / 2 - 50} x2={W / 2 + 10} y2={H / 2 - 72}
+                    stroke="#a1887f" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={W / 2} y1={H / 2 - 50} x2={W / 2} y2={H / 2 - 75}
+                    stroke="#a1887f" strokeWidth={1.5} strokeLinecap="round" />
+                  <text x={W / 2} y={H / 2 + 80} textAnchor="middle" fontSize="20"
+                    fill="#5d4037" fontFamily="Fredoka" fontWeight="700"
+                    style={{ animation: "fadeIn 1s ease forwards" }}>
+                    {"\u{1F92B}"} Shhh... changing...
+                  </text>
+                </g>
+              )}
+
+              {transformStage === 3 && (
+                <g style={{ animation: "cocoonShake 0.3s ease infinite" }}>
+                  <ellipse cx={W / 2} cy={H / 2} rx={35} ry={50}
+                    fill="#8d6e63" stroke="#5d4037" strokeWidth={3} />
+                  <ellipse cx={W / 2 - 5} cy={H / 2 - 10} rx={12} ry={20}
+                    fill="rgba(255,255,255,0.15)" />
+                  <path d={`M ${W / 2 - 5} ${H / 2 - 30} L ${W / 2 - 10} ${H / 2 - 10} L ${W / 2 - 3} ${H / 2 + 5}`}
+                    fill="none" stroke="#ffcc80" strokeWidth={2} strokeLinecap="round"
+                    style={{ animation: "fadeIn 0.5s ease forwards" }} />
+                  <path d={`M ${W / 2 + 8} ${H / 2 - 20} L ${W / 2 + 15} ${H / 2} L ${W / 2 + 5} ${H / 2 + 15}`}
+                    fill="none" stroke="#ffcc80" strokeWidth={2} strokeLinecap="round"
+                    style={{ animation: "fadeIn 0.5s ease 0.3s forwards", opacity: 0 }} />
+                  <line x1={W / 2} y1={H / 2 - 50} x2={W / 2 - 10} y2={H / 2 - 70}
+                    stroke="#a1887f" strokeWidth={2} strokeLinecap="round" />
+                  <line x1={W / 2} y1={H / 2 - 50} x2={W / 2 + 10} y2={H / 2 - 72}
+                    stroke="#a1887f" strokeWidth={2} strokeLinecap="round" />
+                  {[[-40, -30], [45, -20], [-35, 25], [40, 35], [0, -55]].map(([ox, oy], i) => (
+                    <text key={i} x={W / 2 + ox} y={H / 2 + oy} fontSize="16" textAnchor="middle"
+                      style={{ animation: `sparkle 0.6s ease infinite`, animationDelay: `${i * 0.15}s` }}>
+                      {"\u2728"}
+                    </text>
+                  ))}
+                  <text x={W / 2} y={H / 2 + 80} textAnchor="middle" fontSize="22"
+                    fill="#ff8f00" fontFamily="Fredoka" fontWeight="700"
+                    style={{ animation: "fadeIn 0.5s ease forwards" }}>
+                    Something's happening!
+                  </text>
+                </g>
+              )}
+
+              {transformStage === 4 && (
+                <g>
+                  <ellipse cx={W / 2 - 20} cy={H / 2 + 30} rx={18} ry={25}
+                    fill="#a1887f" stroke="#8d6e63" strokeWidth={2}
+                    style={{ animation: "fallLeft 1s ease forwards", opacity: 0.6 }} />
+                  <ellipse cx={W / 2 + 20} cy={H / 2 + 30} rx={18} ry={25}
+                    fill="#a1887f" stroke="#8d6e63" strokeWidth={2}
+                    style={{ animation: "fallRight 1s ease forwards", opacity: 0.6 }} />
+                  <text x={W / 2} y={H / 2} textAnchor="middle" dominantBaseline="central" fontSize="90"
+                    style={{ animation: "butterflyEmerge 1.5s ease forwards" }}>
+                    {"\u{1F98B}"}
+                  </text>
+                  {Array.from({ length: 12 }).map((_, i) => {
+                    const angle = (i / 12) * Math.PI * 2;
+                    const dist = 60 + Math.random() * 40;
+                    return (
+                      <text key={i}
+                        x={W / 2 + Math.cos(angle) * dist}
+                        y={H / 2 + Math.sin(angle) * dist}
+                        fontSize={14 + Math.random() * 10} textAnchor="middle"
+                        style={{ animation: `sparkle 0.8s ease infinite`, animationDelay: `${i * 0.1}s` }}>
+                        {["\u2728", "\u2B50", "\u{1F31F}", "\u{1F4AB}"][i % 4]}
+                      </text>
+                    );
+                  })}
+                  <text x={W / 2} y={H / 2 + 75} textAnchor="middle" fontSize="30"
+                    fill="#1565c0" fontFamily="Fredoka" fontWeight="700"
+                    style={{ animation: "fadeIn 0.8s ease 0.5s forwards", opacity: 0 }}>
+                    {"\u{1F389}"} Beautiful Butterfly! {"\u{1F389}"}
+                  </text>
+                </g>
+              )}
+            </g>
+          )}
+        </svg>
+
+        {message && (
+          <div style={{
+            position: "absolute", top: 30, left: "50%", transform: "translateX(-50%)",
+            padding: "10px 28px", borderRadius: 24,
+            background: message.type === "good" ? "rgba(76,175,80,0.95)" : "rgba(244,67,54,0.95)",
+            color: "#fff", fontWeight: 700, fontSize: 24,
+            boxShadow: "0 6px 20px rgba(0,0,0,0.3)",
+            animation: "popIn 0.3s ease",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}>
+            {message.text}
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        marginTop: 14, color: "rgba(255,255,255,0.7)", fontSize: 18, fontWeight: 600,
+        display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap", justifyContent: "center",
+      }}>
+        <span>{"\u2B06\uFE0F\u2B07\uFE0F\u2B05\uFE0F\u27A1\uFE0F"} Move</span>
+        <span>{"\u{1F343}\u{1F90D}"} Yummy!</span>
+        <span>{"\u{1F336}\uFE0F"} Too spicy!</span>
+      </div>
+
+      <style>{`
+        @keyframes popIn {
+          0% { transform: translateX(-50%) scale(0.5); opacity: 0; }
+          100% { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+        @keyframes curlIn {
+          0% { opacity: 0.5; r: 8; }
+          100% { opacity: 1; }
+        }
+        @keyframes cocoonForm {
+          0% { rx: 10; ry: 15; opacity: 0.3; }
+          100% { rx: 35; ry: 50; opacity: 1; }
+        }
+        @keyframes cocoonShake {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          25% { transform: translateX(-4px) rotate(-2deg); }
+          75% { transform: translateX(4px) rotate(2deg); }
+        }
+        @keyframes sparkle {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.3; transform: scale(0.6); }
+        }
+        @keyframes fadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes butterflyEmerge {
+          0% { opacity: 0; font-size: 0px; transform: translateY(20px); }
+          50% { opacity: 1; font-size: 50px; transform: translateY(-5px); }
+          100% { opacity: 1; font-size: 90px; transform: translateY(0px); }
+        }
+        @keyframes fallLeft {
+          0% { transform: translate(0, 0) rotate(0deg); opacity: 0.6; }
+          100% { transform: translate(-50px, 60px) rotate(-40deg); opacity: 0; }
+        }
+        @keyframes fallRight {
+          0% { transform: translate(0, 0) rotate(0deg); opacity: 0.6; }
+          100% { transform: translate(50px, 60px) rotate(40deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function FloatingEmoji() {
+  const emojis = ["\u{1F343}", "\u{1F33F}", "\u{1F340}", "\u{1F90D}", "\u{1F338}", "\u{1F343}", "\u{1F33F}"];
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <div key={i} style={{
+          position: "absolute",
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          fontSize: 16 + Math.random() * 12,
+          opacity: 0.12,
+          animation: `drift ${8 + Math.random() * 8}s ease-in-out infinite alternate`,
+          animationDelay: `${Math.random() * 5}s`,
+        }}>
+          {emojis[Math.floor(Math.random() * emojis.length)]}
+        </div>
+      ))}
+      <style>{`
+        @keyframes drift {
+          0% { transform: translateY(0) rotate(0deg); }
+          100% { transform: translateY(-30px) rotate(20deg); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function TitleScreen({ onStart }) {
+  return (
+    <div style={{
+      width: "100%", minHeight: "100vh",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(180deg, #1b5e20 0%, #2e7d32 50%, #66bb6a 100%)",
+      fontFamily: "'Fredoka', sans-serif",
+      position: "relative", overflow: "hidden",
+    }}>
+      <FloatingEmoji />
+
+      <div style={{
+        fontSize: 100, marginBottom: 10,
+        animation: "catWiggle 1.5s ease-in-out infinite",
+      }}>{"\u{1F41B}"}</div>
+
+      <h1 style={{
+        fontSize: 44, color: "#fff", fontWeight: 700,
+        textShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        margin: 0, letterSpacing: 2, textAlign: "center",
+      }}>The Very Hungry</h1>
+      <h1 style={{
+        fontSize: 56, color: "#fdd835", fontWeight: 700,
+        textShadow: "0 4px 20px rgba(0,0,0,0.4)",
+        margin: "0 0 24px 0", letterSpacing: 2, textAlign: "center",
+      }}>Caterpillar</h1>
+
+      <div style={{
+        background: "rgba(0,0,0,0.2)", borderRadius: 20, padding: "24px 36px",
+        maxWidth: 420, textAlign: "center", color: "rgba(255,255,255,0.95)",
+        fontSize: 20, lineHeight: 2, marginBottom: 28,
+        backdropFilter: "blur(10px)",
+        border: "2px solid rgba(255,255,255,0.1)",
+      }}>
+        <div style={{ fontSize: 30 }}>{"\u{1F343} \u{1F90D} \u{1F33F} \u{1F90D} \u{1F340} \u{1F90D} \u{1F33F} \u{1F343}"}</div>
+        <div style={{ margin: "8px 0" }}>Eat <b>leaves & marshmallows</b> to grow big!</div>
+        <div>Don't eat the <span style={{ color: "#ef5350", fontSize: 24 }}>{"\u{1F336}\uFE0F"} chilli</span>!</div>
+        <div style={{ marginTop: 8 }}>Grow big to become a <b style={{ fontSize: 26 }}>{"\u{1F98B}"}</b></div>
+      </div>
+
+      <button onClick={onStart} style={{
+        background: "linear-gradient(135deg, #e53935, #ff9800)",
+        color: "#fff", border: "none", borderRadius: 30,
+        padding: "18px 56px", fontSize: 28, fontWeight: 700,
+        cursor: "pointer", fontFamily: "'Fredoka', sans-serif",
+        boxShadow: "0 6px 24px rgba(229,57,53,0.4)",
+        transition: "transform 0.2s, box-shadow 0.2s",
+        letterSpacing: 1,
+      }}
+        onMouseEnter={(e) => { e.target.style.transform = "scale(1.08)"; }}
+        onMouseLeave={(e) => { e.target.style.transform = "scale(1)"; }}
+      >
+        {"\u25B6"} Let's Eat!
+      </button>
+      <div style={{ color: "rgba(255,255,255,0.4)", marginTop: 14, fontSize: 14 }}>
+        Press Space to start
+      </div>
+
+      <style>{`
+        @keyframes catWiggle {
+          0%, 100% { transform: rotate(-8deg) translateY(0); }
+          25% { transform: rotate(5deg) translateY(-8px); }
+          50% { transform: rotate(-5deg) translateY(0); }
+          75% { transform: rotate(7deg) translateY(-6px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function WinScreen({ score, eaten, onRestart }) {
+  return (
+    <div style={{
+      width: "100%", minHeight: "100vh",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      background: "linear-gradient(180deg, #e3f2fd 0%, #bbdefb 40%, #90caf9 100%)",
+      fontFamily: "'Fredoka', sans-serif",
+      position: "relative", overflow: "hidden",
+    }}>
+      {Array.from({ length: 18 }).map((_, i) => (
+        <div key={i} style={{
+          position: "fixed", fontSize: 26 + Math.random() * 24,
+          left: `${Math.random() * 100}%`,
+          animation: `floatUp ${5 + Math.random() * 5}s ease-in-out infinite`,
+          animationDelay: `${Math.random() * 4}s`,
+          opacity: 0.5,
+        }}>
+          {["\u{1F338}", "\u{1F33A}", "\u{1F33B}", "\u{1F337}", "\u{1F33C}", "\u2B50", "\u2728"][Math.floor(Math.random() * 7)]}
+        </div>
+      ))}
+
+      <div style={{
+        fontSize: 120, marginBottom: 10,
+        animation: "butterflyFly 3s ease-in-out infinite",
+      }}>{"\u{1F98B}"}</div>
+
+      <h1 style={{
+        fontSize: 52, color: "#1565c0",
+        textShadow: "0 3px 12px rgba(21,101,192,0.2)",
+        margin: "0 0 10px 0", fontWeight: 700, textAlign: "center",
+      }}>You're a Butterfly!</h1>
+
+      <p style={{
+        color: "#1976d2", fontSize: 24, margin: "0 0 6px 0", textAlign: "center",
+      }}>The caterpillar ate {eaten} treats!</p>
+      <p style={{
+        color: "#1976d2", fontSize: 32, fontWeight: 700, margin: "0 0 28px 0",
+      }}>{"\u2B50"} Score: {score} {"\u2B50"}</p>
+
+      <button onClick={onRestart} style={{
+        background: "linear-gradient(135deg, #42a5f5, #7c4dff)",
+        color: "#fff", border: "none", borderRadius: 30,
+        padding: "18px 56px", fontSize: 26, fontWeight: 700,
+        cursor: "pointer", fontFamily: "'Fredoka', sans-serif",
+        boxShadow: "0 6px 24px rgba(66,165,245,0.4)",
+      }}>
+        {"\u{1F504}"} Play Again!
+      </button>
+      <div style={{ color: "rgba(21,101,192,0.4)", marginTop: 12, fontSize: 14 }}>
+        Press Space
+      </div>
+
+      <style>{`
+        @keyframes butterflyFly {
+          0%, 100% { transform: translateY(0) rotate(-5deg); }
+          50% { transform: translateY(-25px) rotate(5deg); }
+        }
+        @keyframes floatUp {
+          0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+          10% { opacity: 0.5; }
+          90% { opacity: 0.5; }
+          100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+ReactDOM.render(<HungryCaterpillarGame />, document.getElementById('root'));
+</script>
+</body>
+</html>
