@@ -367,6 +367,11 @@
   .game-card.theme-sun .card-tag { background: rgba(255, 217, 61, 0.2); color: #FFE566; }
   .game-card.theme-sun .card-play { color: #FFE566; }
 
+  .game-card.theme-rainbow { --card-accent: #FF8C42; }
+  .game-card.theme-rainbow .card-preview { background: linear-gradient(135deg, #5C2A0A, #A04E1A); }
+  .game-card.theme-rainbow .card-tag { background: rgba(255, 140, 66, 0.2); color: #FFB07A; }
+  .game-card.theme-rainbow .card-play { color: #FFB07A; }
+
   /* === COMING SOON CARD === */
   .game-card.coming-soon {
     border-style: dashed;
@@ -536,6 +541,19 @@
           <span class="card-tag">Action</span>
           <h3 class="card-title">Plane Dash</h3>
           <p class="card-desc">Dodge obstacles and fly your plane through the sky! How far can you go?</p>
+          <div class="card-play">Play Now →</div>
+        </div>
+      </a>
+
+      <!-- Pattern Game -->
+      <a href="pattern-game.html" class="game-card theme-rainbow">
+        <div class="card-preview">
+          <span class="card-emoji">🎨</span>
+        </div>
+        <div class="card-body">
+          <span class="card-tag">Learning</span>
+          <h3 class="card-title">Pattern Game</h3>
+          <p class="card-desc">Spot the pattern and pick what comes next! Play with colours, cars, animals, fruit and more. Parent controls to adjust difficulty.</p>
           <div class="card-play">Play Now →</div>
         </div>
       </a>
